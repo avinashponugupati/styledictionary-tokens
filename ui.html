@@ -1,0 +1,209 @@
+<style>
+  body {
+    background-color: var(--figma-color-bg);
+    color: var(--figma-color-text);
+  }
+
+  .main-container {
+    margin: 15px;
+  }
+
+  pre {
+    position: relative;
+    height: 500px;
+    padding: 15px;
+    margin: 0;
+    background-color: black;
+    color: white;
+    overflow-y: scroll;
+  }
+
+  .file-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px;
+    margin-top: 15px;
+    height: 20px;
+    font-size: 24px;
+    background-color: var(--figma-color-bg-disabled);
+    color: #000;
+  }
+
+  #output {
+    display: none;
+  }
+
+  #tokens-json-wrapper {
+    display: none;
+  }
+
+  button {
+    background-color: var(--figma-color-bg-brand);
+    color: var(--figma-color-text-oncomponent);
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background-color: var(--figma-color-bg-brand-hover);
+  }
+
+  .form-field {
+    font-size: 18px;
+    font-weight: bold;
+  }
+</style>
+<main>
+  <h2>Convert Figma variables to style-dictionary tokens</h2>
+  <section id="main-container">
+    <form id="config" name="config">
+      <!-- create your own config -->
+    </form>
+    <button id="create">Generate Tokens</button>
+    <button id="cancel">Close</button>
+
+    <section id="output">
+      <div class="file-title">
+        <p>tokens.json</p>
+        <button id="export-base-tokens">Export base tokens</button>
+        <button id="export-theme-tokens">Export theme tokens</button>
+        <button id="export-merged-tokens">Export all tokens</button>
+      </div>
+      <pre id="tokens-json-wrapper">
+        <code id="tokens-json"></code>
+      </pre>
+    </section>
+  </section>
+</main>
+
+<script>
+  /**
+ * Download a list of files.
+ * @author speedplane
+ */
+  function download_files(files) {
+    function download_next(i) {
+      if (i >= files.length) {
+        return;
+      }
+      var a = document.createElement('a');
+      const file = files[i].download;
+      const url = URL.createObjectURL(file)
+      a.href = url;
+      a.target = '_parent';
+      // Use a.download if available, it prevents plugins from opening.
+      if ('download' in a) {
+        a.download = files[i].filename;
+      }
+      // Add a to the doc for click to work.
+      (document.body || document.documentElement).appendChild(a);
+      a.click();
+      // Delete the temporary link.
+      a.parentNode.removeChild(a);
+      // Download the next file with a small timeout. The timeout is necessary
+      // for IE, which will otherwise only download the first file.
+      setTimeout(function () {
+        download_next(i + 1);
+      }, 2000);
+    }
+    // Initiate the first download.
+    download_next(0);
+  }
+</script>
+
+<script>
+
+  function displayJSONOutput() {
+    document.getElementById("tokens-json-wrapper").style.display = "block";
+  }
+
+  function download(file) {
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(file)
+
+    link.href = url
+    link.download = file.name
+    document.body.appendChild(link)
+    link.click()
+
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+  var mergedTokens, themeTokens, baseTokens, finalTokens;
+
+  document.getElementById('create').onclick = () => {
+    const configForm = document.forms.config;
+    const formData = new FormData(configForm);
+    const config = Object.fromEntries(formData);
+    parent.postMessage({ pluginMessage: { type: 'run', config } }, '*');
+    document.getElementById('output').style.display = 'block';
+  }
+
+  document.getElementById('cancel').onclick = () => {
+    parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
+  }
+
+  document.getElementById('export-merged-tokens').onclick = () => {
+    displayJSONOutput();
+    document.getElementById('tokens-json').innerText = mergedTokens;
+
+    const file = new File([mergedTokens], 'all-tokens.json', {
+      type: 'application/json',
+    });
+    download(file);
+  }
+
+  document.getElementById('export-theme-tokens').onclick = () => {
+    displayJSONOutput();
+    document.getElementById('tokens-json').innerText = JSON.stringify(themeTokens, undefined, 4);
+
+    const files = Object.keys(themeTokens).map(theme => {
+      const tokens = JSON.stringify(themeTokens[theme], undefined, 4)
+      const file = new File([tokens], `${theme}.json`, {
+        type: 'application/json',
+      });
+
+      return {
+        download: file,
+        filename: `${theme}.json`
+      }
+    });
+
+    download_files(files)
+  }
+
+  document.getElementById('export-base-tokens').onclick = () => {
+    displayJSONOutput();
+    document.getElementById('tokens-json').innerText = baseTokens;
+
+    const file = new File([baseTokens], 'base-tokens.json', {
+      type: 'application/json',
+    });
+    download(file);
+  }
+
+  onmessage = (event) => {
+    const { type, data } = event.data.pluginMessage;
+    switch (type) {
+      case "mergedTokens": {
+        mergedTokens = data;
+        break;
+      }
+
+      case "baseTokens": {
+        baseTokens = data;
+        break;
+      }
+
+      case "themeTokens": {
+        themeTokens = data;
+        break;
+      }
+    }
+  }
+
+
+</script>

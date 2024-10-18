@@ -1,0 +1,11 @@
+# Node
+*.log
+*.log.*
+node_modules
+.DS_Store
+
+highlight
+highlight.zip
+out/
+dist/
+code.js
